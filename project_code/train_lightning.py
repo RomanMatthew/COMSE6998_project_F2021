@@ -85,6 +85,26 @@ class OrthoMatrix:
         matrix = torch.cat((x, y, z), 2)  # batch*3*3
         return matrix
 
+    # euler batch*4
+    # output cuda batch*3*3 matrices in the rotation order of XZ'Y'' (intrinsic) or YZX (extrinsic)
+    def compute_rotation_matrix_from_euler(self, euler):
+        batch = euler.shape[0]
+
+        c1 = torch.cos(euler[:, 0]).view(batch, 1)  # batch*1
+        s1 = torch.sin(euler[:, 0]).view(batch, 1)  # batch*1
+        c2 = torch.cos(euler[:, 2]).view(batch, 1)  # batch*1
+        s2 = torch.sin(euler[:, 2]).view(batch, 1)  # batch*1
+        c3 = torch.cos(euler[:, 1]).view(batch, 1)  # batch*1
+        s3 = torch.sin(euler[:, 1]).view(batch, 1)  # batch*1
+
+        row1 = torch.cat((c2 * c3, -s2, c2 * s3), 1).view(-1, 1, 3)  # batch*1*3
+        row2 = torch.cat((c1 * s2 * c3 + s1 * s3, c1 * c2, c1 * s2 * s3 - s1 * c3), 1).view(-1, 1, 3)  # batch*1*3
+        row3 = torch.cat((s1 * s2 * c3 - c1 * s3, s1 * c2, s1 * s2 * s3 + c1 * c3), 1).view(-1, 1, 3)  # batch*1*3
+
+        matrix = torch.cat((row1, row2, row3), 1)  # batch*3*3
+
+        return matrix
+
 
 class RotationNet(nn.Module):
     def __init__(self):
@@ -140,7 +160,7 @@ class RotationConvNet(nn.Module):
 
         self.layer1 = nn.Linear(64 * h_out * w_out, 16 * int(h_out / 4) * int(w_out / 4))
         self.relu = nn.ReLU()
-        self.layer2 = nn.Linear(16 * int(h_out / 4) * int(w_out / 4), 6)
+        self.layer2 = nn.Linear(16 * int(h_out / 4) * int(w_out / 4), 3)
 
         self.ortho_mat = OrthoMatrix()
 
@@ -152,7 +172,7 @@ class RotationConvNet(nn.Module):
         x = self.layer1(x.reshape(bsize, -1))
         x = self.relu(x)
         x = self.layer2(x)  # [B, 6]
-        x = self.ortho_mat.compute_rotation_matrix_from_ortho6d(x)  # Shape: [B, 3, 3]
+        x = self.ortho_mat.compute_rotation_matrix_from_euler(x)  # Shape: [B, 3, 3]
         return x
 
 
