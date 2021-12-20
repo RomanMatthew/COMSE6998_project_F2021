@@ -164,6 +164,7 @@ class RotationNetPl(pl.LightningModule):
         # self.model = RotationNet()
         self.model = RotationConvNet((64, 64), input_channels=8)
         self.geo_dist = GeodesicDist(reduction="mean")
+        self.loss_l2 = nn.MSELoss(reduction="mean")
 
     def forward(self, inputs: torch.Tensor):
         """Note: Unused
@@ -181,8 +182,9 @@ class RotationNetPl(pl.LightningModule):
 
         preds = self.model(inputs)  # Shape: [B, 6]
 
-        loss = self.geo_dist(preds, labels)
-        angle = loss.detach().item() * 180 / np.pi
+        loss = self.loss_l2(preds, labels)
+        dist = self.geo_dist(preds, labels)
+        angle = dist.detach().item() * 180 / np.pi
         return loss, angle
 
     def training_step(self, batch, batch_idx):

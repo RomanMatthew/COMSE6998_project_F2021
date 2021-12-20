@@ -81,7 +81,7 @@ def main():
     pl.seed_everything(42, workers=True)  # set seed for reproducibility
     GENERATE_VIZ = False
     wandb_project = "rotenv"
-    WANDB_RUN_ID = "3c3q3v0j"
+    WANDB_RUN_ID = "16t1xy13"
     CKPT_PATH = f"./logs/{wandb_project}/{WANDB_RUN_ID}/checkpoints/best.ckpt"  # Make sure the keep the logs structure
 
     dir_root = Path("./logs")
