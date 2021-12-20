@@ -85,6 +85,36 @@ class OrthoMatrix:
         matrix = torch.cat((x, y, z), 2)  # batch*3*3
         return matrix
 
+    # quaternion batch*4
+    def compute_rotation_matrix_from_quaternion(self, quaternion):
+        batch = quaternion.shape[0]
+
+        quat = self.normalize_vector(quaternion).contiguous()
+
+        qw = quat[..., 0].contiguous().view(batch, 1)
+        qx = quat[..., 1].contiguous().view(batch, 1)
+        qy = quat[..., 2].contiguous().view(batch, 1)
+        qz = quat[..., 3].contiguous().view(batch, 1)
+
+        # Unit quaternion rotation matrices computatation
+        xx = qx * qx
+        yy = qy * qy
+        zz = qz * qz
+        xy = qx * qy
+        xz = qx * qz
+        yz = qy * qz
+        xw = qx * qw
+        yw = qy * qw
+        zw = qz * qw
+
+        row0 = torch.cat((1 - 2 * yy - 2 * zz, 2 * xy - 2 * zw, 2 * xz + 2 * yw), 1)  # batch*3
+        row1 = torch.cat((2 * xy + 2 * zw, 1 - 2 * xx - 2 * zz, 2 * yz - 2 * xw), 1)  # batch*3
+        row2 = torch.cat((2 * xz - 2 * yw, 2 * yz + 2 * xw, 1 - 2 * xx - 2 * yy), 1)  # batch*3
+
+        matrix = torch.cat((row0.view(batch, 1, 3), row1.view(batch, 1, 3), row2.view(batch, 1, 3)), 1)  # batch*3*3
+
+        return matrix
+
 
 class RotationNet(nn.Module):
     def __init__(self):
@@ -140,7 +170,7 @@ class RotationConvNet(nn.Module):
 
         self.layer1 = nn.Linear(64 * h_out * w_out, 16 * int(h_out / 4) * int(w_out / 4))
         self.relu = nn.ReLU()
-        self.layer2 = nn.Linear(16 * int(h_out / 4) * int(w_out / 4), 6)
+        self.layer2 = nn.Linear(16 * int(h_out / 4) * int(w_out / 4), 4)
 
         self.ortho_mat = OrthoMatrix()
 
@@ -152,7 +182,7 @@ class RotationConvNet(nn.Module):
         x = self.layer1(x.reshape(bsize, -1))
         x = self.relu(x)
         x = self.layer2(x)  # [B, 6]
-        x = self.ortho_mat.compute_rotation_matrix_from_ortho6d(x)  # Shape: [B, 3, 3]
+        x = self.ortho_mat.compute_rotation_matrix_from_quaternion(x)  # Shape: [B, 3, 3]
         return x
 
 
